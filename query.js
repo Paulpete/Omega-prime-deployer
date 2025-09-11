@@ -1,17 +1,20 @@
 async function transferSOLWithRelayer(senderKeyPath, recipientAddress, amountSol) {
   // Helius Sender endpoint expects a VersionedTransaction with tip and priority fee
-  const TIP_ACCOUNTS = [
-    "4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE",
-    "D2L6yPZ2FmmmTKPgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ",
-    "9bnz4RShgq1hAnLnZbP8kbgBg1kEmcJBYQq3gQbmnSta",
-    "5VY91ws6B2hMmBFRsXkoAAdsPHBJwRfBht4DXox3xkwn",
-    "2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjiksCXJ7hfEYgD",
-    "2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ",
-    "wyvPkWjVZz1M8fHQnMMCDTQDbkManefNNhweYk5WkcF",
-    "3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT",
-    "4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey",
-    "4TQLFNWK8AovT1gFvda5jfw2oJeRMKEmw7aH6MGBJ3or"
-  ];
+  // TIP_ACCOUNTS can be set as a comma-separated list in the environment variable TIP_ACCOUNTS
+  const TIP_ACCOUNTS = process.env.TIP_ACCOUNTS
+    ? process.env.TIP_ACCOUNTS.split(',').map(addr => addr.trim()).filter(Boolean)
+    : [
+        "4ACfpUFoaSD9bfPdeu6DBt89gB6ENTeHBXCAi87NhDEE",
+        "D2L6yPZ2FmmmTKPgzaMKdhu6EWZcTpLy1Vhx8uvZe7NZ",
+        "9bnz4RShgq1hAnLnZbP8kbgBg1kEmcJBYQq3gQbmnSta",
+        "5VY91ws6B2hMmBFRsXkoAAdsPHBJwRfBht4DXox3xkwn",
+        "2nyhqdwKcJZR2vcqCyrYsaPVdAnFoJjiksCXJ7hfEYgD",
+        "2q5pghRs6arqVjRvT5gfgWfWcHWmw1ZuCzphgd5KfWGJ",
+        "wyvPkWjVZz1M8fHQnMMCDTQDbkManefNNhweYk5WkcF",
+        "3KCKozbAaF75qEU33jtzozcJ29yJuaLJTy2jFdzUY8bT",
+        "4vieeGHPYPG2MmyPRcYjdiDmmhN3ww7hsFNap8pVN3Ey",
+        "4TQLFNWK8AovT1gFvda5jfw2oJeRMKEmw7aH6MGBJ3or"
+      ];
   const senderSecret = JSON.parse(fs.readFileSync(senderKeyPath, 'utf-8'));
   const sender = web3.Keypair.fromSecretKey(Uint8Array.from(senderSecret));
   const recipient = new web3.PublicKey(recipientAddress);
