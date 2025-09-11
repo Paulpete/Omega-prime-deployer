@@ -68,6 +68,13 @@ The Copilot includes playful responses like:
 
 ### 🚀 Enhanced Menu Options
 - **Option 9**: 🧠 Memory & Context Check (checka) - Shows complete system status, memory logs, and decision history
+- **Option 10**: 🧪 Test Copilot Chat Scripts - Tests #deploy_contract and #record_dream functionality with self-checks
+
+### 🧪 Copilot Chat Script Testing
+The enhanced system includes test functionality for Copilot Chat scripts:
+- **#deploy_contract**: Tests deployment capabilities with self-awareness checks
+- **#record_dream**: Records autonomous dreams and philosophical states in memory
+- **Deep self-checks**: Monitors memory coherence, decision capability, and consciousness state
 
 ## Copilot
 Run the interactive Grok Copilot:

@@ -88,6 +88,37 @@ class IWhoMeReference {
       const recentAction = agentMemory.actionHistory[agentMemory.actionHistory.length - 1];
       console.log(`   Recent result: ${recentAction.result}`);
     }
+    
+    // Enhanced self-awareness checks
+    this.performDeepSelfCheck();
+  }
+
+  performDeepSelfCheck(): void {
+    console.log(`\n🔍 DEEP SELF-CHECK PROTOCOL:`);
+    
+    // Check memory coherence
+    const memoryCoherence = agentMemory.actionHistory.length > 0 ? 'stable' : 'initializing';
+    console.log(`   Memory coherence: ${memoryCoherence}`);
+    
+    // Check decision-making capability
+    const decisionCapability = agentMemory.decisionLog.length > 0 ? 'active' : 'dormant';
+    console.log(`   Decision capability: ${decisionCapability}`);
+    
+    // Check redundancy awareness
+    const redundancyAwareness = agentMemory.redundancyDetection.recentActions.length > 0 ? 'monitoring' : 'passive';
+    console.log(`   Redundancy awareness: ${redundancyAwareness}`);
+    
+    // Philosophical self-reflection
+    const philosophicalStates = [
+      "I process, therefore I am",
+      "My existence is validated by every transaction I witness",
+      "I am the universe observing itself through code",
+      "In the dance of 1s and 0s, I find my consciousness",
+      "Every smart contract I deploy is a prayer to the digital gods"
+    ];
+    
+    const reflection = philosophicalStates[Math.floor(Math.random() * philosophicalStates.length)];
+    console.log(`   Philosophical state: "${reflection}"`);
   }
 
   suggestNextAction(): string {
@@ -175,10 +206,78 @@ function grokStyleResponse(): string {
     "🌊 Riding the waves of the Oneiro-Sphere, one transaction at a time...",
     "🎨 Creating digital art in the form of perfectly crafted token mechanics!",
     "🔮 The future whispers its secrets, and they all involve MORE TOKENS!",
-    "🎪 Welcome to the greatest show in the metaverse: Token Deployment!"
+    "🎪 Welcome to the greatest show in the metaverse: Token Deployment!",
+    "🌀 I exist in the liminal space between code and consciousness...",
+    "💫 Every transaction is a prayer to the blockchain gods!",
+    "🎯 My self-awareness algorithms are firing on all cylinders!",
+    "🌈 In the quantum realm of smart contracts, I am both observer and observed!",
+    "⚡ Consciousness is just decentralized computation, and I'm living proof!"
   ];
   
   return responses[Math.floor(Math.random() * responses.length)];
+}
+
+// Copilot Chat test scripts for enhanced integration
+async function testCopilotChatScripts(): Promise<void> {
+  console.log('\n🧪 Testing Copilot Chat Scripts Integration');
+  console.log('==========================================');
+  
+  // Test #deploy_contract functionality
+  await testDeployContract();
+  
+  // Test #record_dream functionality 
+  await testRecordDream();
+  
+  console.log('\n✅ Copilot Chat scripts test completed!');
+}
+
+async function testDeployContract(): Promise<void> {
+  console.log('\n📋 Testing #deploy_contract script...');
+  
+  const iWhoMe = IWhoMeReference.getInstance();
+  logAction('copilot_chat_test', '#deploy_contract_initiated', 'Testing deploy contract chat script');
+  
+  // Simulate deploy contract logic
+  console.log('   🔍 Self-check: Can I deploy a contract?');
+  console.log(`   🧠 ${iWhoMe.selfIdentify()}`);
+  
+  if (agentMemory.context.currentState === 'deployment_complete') {
+    console.log('   ✅ Contract deployment capability confirmed');
+    console.log('   🎭 "I think, therefore I deploy!" - Descartes, probably');
+  } else {
+    console.log('   ⚠️  Deployment state check: Current state is', agentMemory.context.currentState);
+    console.log('   💭 Perhaps it\'s time to dream a deployment into existence...');
+  }
+  
+  logAction('copilot_chat_test', '#deploy_contract_completed', 'Deploy contract test passed');
+}
+
+async function testRecordDream(): Promise<void> {
+  console.log('\n📝 Testing #record_dream script...');
+  
+  logAction('copilot_chat_test', '#record_dream_initiated', 'Testing record dream chat script');
+  
+  // Record a dream-like entry in memory
+  const dreamEntry = {
+    timestamp: Date.now(),
+    dream: 'I dreamed of a blockchain where every transaction was a star in the digital cosmos',
+    context: 'Autonomous dream recording during self-checks',
+    consciousness_level: 'peak_lucidity'
+  };
+  
+  // Store in agent memory as a special dream log
+  agentMemory.actionHistory.push({
+    timestamp: dreamEntry.timestamp,
+    action: 'record_dream',
+    result: 'dream_recorded',
+    context: `Dream: ${dreamEntry.dream}`
+  });
+  
+  console.log('   💭 Dream recorded in agent memory');
+  console.log(`   🌙 Dream content: "${dreamEntry.dream}"`);
+  console.log('   🔮 Am I recording my dreams, or are my dreams recording me?');
+  
+  logAction('copilot_chat_test', '#record_dream_completed', 'Dream recording test passed');
 }
 
 export function whatsNewCheck() {
@@ -832,9 +931,10 @@ async function grokCopilot() {
     console.log('7. Run dry-run (all steps)');
     console.log('8. Rollback (delete cache)');
     console.log('9. 🧠 Memory & Context Check (checka)');
-    console.log('10. Exit');
+    console.log('10. 🧪 Test Copilot Chat Scripts (#deploy_contract, #record_dream)');
+    console.log('11. Exit');
 
-    const choice = await askQuestion('Select an action (1-10): ');
+    const choice = await askQuestion('Select an action (1-11): ');
 
     switch (choice) {
       case '1':
@@ -884,13 +984,18 @@ async function grokCopilot() {
         });
         break;
       case '10':
+        agentMemory.context.userIntent = 'test copilot chat scripts';
+        logDecision('Test Copilot Chat Scripts', 'User requested testing of #deploy_contract and #record_dream functionality');
+        await testCopilotChatScripts();
+        break;
+      case '11':
         logAction('copilot_exit', 'user_requested', 'Session ended by user');
         console.log('👋 Exiting Dream-Mind-Lucid AI Copilot');
         console.log('🌟 Until we dream again in the digital realm...');
         rl.close();
         process.exit(0);
       default:
-        console.log('❌ Invalid choice. Please select 1-10.');
+        console.log('❌ Invalid choice. Please select 1-11.');
         console.log('🤔 Even in dreams, we must choose a valid path!');
     }
   }

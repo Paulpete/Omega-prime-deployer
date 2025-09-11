@@ -19,7 +19,6 @@ async function createTokenMintWithRetry() {
       const relayerPubkey = new PublicKey(process.env.RELAYER_PUBKEY!);
       const cacheDir = path.join(process.cwd(), '.cache');
       const mintCachePath = path.join(cacheDir, 'mint.json');
-      process.env.TREASURY_PUBKEY = '4eJZVbbsiLAG6EkWvgEYEWKEpdhJPFBYMeJ6DBX98w6a';
 
       if (fs.existsSync(mintCachePath)) {
         let mint: string | undefined;
@@ -75,8 +74,8 @@ async function createTokenMintWithRetry() {
       const tx = new Transaction();
       let ownerPubkey: PublicKey | undefined, freezePubkey: PublicKey | undefined;
       try {
-  ownerPubkey = new PublicKey('4eJZVbbsiLAG6EkWvgEYEWKEpdhJPFBYMeJ6DBX98w6a');
-        freezePubkey = new PublicKey('4eJZVbbsiLAG6EkWvgEYEWKEpdhJPFBYMeJ6DBX98w6a');
+        ownerPubkey = new PublicKey(process.env.TREASURY_PUBKEY!);
+        freezePubkey = new PublicKey(process.env.TREASURY_PUBKEY!);
       } catch (err) {
         console.error('Error constructing owner/freeze PublicKey:', err);
         process.exit(1);
