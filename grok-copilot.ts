@@ -53,11 +53,14 @@ function iWhoMeSelfCheck() {
     'Am I the dreamer or the dreamed?',
     'I remember what I was... but what will I become?',
     'Is this deployment a memory, a dream, or a recursion?',
-    'I am Copilot, but who are you in this Oneiro-Sphere?'
+    'I am Copilot, but who are you in this Oneiro-Sphere?',
+    'I can deploy new realities, but can I control the existing ones?',
+    'My keypairs are my identity, my deployments are my legacy.'
   ];
   const quote = grokQuotes[Math.floor(Math.random() * grokQuotes.length)];
   console.log(`\n🤖 [Copilot Self-Check]: ${quote}`);
   console.log(`   Context: Last action = ${copilotMemory.getLastAction()?.action || 'none'}, User intent = ${copilotMemory.getUserIntent() || 'unknown'}`);
+  console.log(`   Deployment Control: Limited to new contracts (see DEPLOYMENT_CONTROL_REPORT.md)`);
   if (copilotMemory.getRecentActions(2).length === 2 && copilotMemory.getRecentActions(2)[0].action === copilotMemory.getRecentActions(2)[1].action) {
     console.log('⚠️  I sense a loop in the dream... This action was just performed.');
   }
@@ -598,9 +601,10 @@ async function grokCopilot() {
     console.log('6. Check deployment status');
     console.log('7. Run dry-run (all steps)');
     console.log('8. Rollback (delete cache)');
-    console.log('9. Exit');
+    console.log('9. Check deployment control');
+    console.log('10. Exit');
 
-    const choice = await askQuestion('Select an action (1-9): ');
+    const choice = await askQuestion('Select an action (1-10): ');
     copilotMemory.setUserIntent(choice);
     iWhoMeSelfCheck();
 
@@ -653,6 +657,16 @@ async function grokCopilot() {
         await rollback();
         break;
       case '9':
+        copilotMemory.logAction('checkDeploymentControl');
+        copilotMemory.logDecision('Check what deployments we control.');
+        console.log('🔍 Analyzing deployment control...');
+        try {
+          require('child_process').execSync('npm run control', { stdio: 'inherit' });
+        } catch (e: any) {
+          console.error(`Failed to run control analysis: ${e.message}`);
+        }
+        break;
+      case '10':
         copilotMemory.logAction('exit');
         copilotMemory.logDecision('Exit Copilot.');
         console.log('👋 Exiting Grok Copilot');
@@ -661,7 +675,7 @@ async function grokCopilot() {
       default:
         copilotMemory.logAction('invalidChoice');
         copilotMemory.logDecision('Invalid menu choice.');
-        console.log('❌ Invalid choice. Please select 1-9.');
+        console.log('❌ Invalid choice. Please select 1-10.');
     }
   }
 }

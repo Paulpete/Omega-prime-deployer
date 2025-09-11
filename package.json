@@ -14,6 +14,9 @@
     "mainnet:all": "npm run dev:check && npm run mainnet:create-mint && npm run mainnet:mint-initial && npm run mainnet:set-metadata && npm run mainnet:lock",
     "verify:addresses": "node comprehensive-address-verifier.js",
     "verify:demo": "node address-verifier-demo.js",
+    "analyze:control": "node deployment-control-analyzer.js",
+    "analyze:control-simple": "node deployment-control-simple.js",
+    "control": "node deployment-control-simple.js",
     "build": "tsc",
     "build:rust": "cargo build --manifest-path pentacle/Cargo.toml",
     "build:all": "npm run build && npm run build:rust"
