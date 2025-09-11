@@ -1,10 +1,9 @@
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
-import { createMetadataAccountV3, updateMetadataAccountV2 } from '@metaplex-foundation/mpl-token-metadata';
-import { keypairIdentity, PublicKey } from '@metaplex-foundation/umi';
+import { createMetadataAccountV3, updateMetadataAccountV2, findMetadataPda } from '@metaplex-foundation/mpl-token-metadata';
+import { keypairIdentity } from '@metaplex-foundation/umi';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { findMetadataPda } from './utils/pdas';
 
 dotenv.config();
 
@@ -26,14 +25,25 @@ async function setTokenMetadata() {
     console.error('Mint not created. Run createMint.ts first.');
     process.exit(1);
   }
+
   const mintKeypairJson = JSON.parse(fs.readFileSync(mintKeypairPath, 'utf-8'));
   const umi = createUmi(process.env.RPC_URL!);
   const mintKeypair = umi.eddsa.createKeypairFromSecretKey(Uint8Array.from(mintKeypairJson));
   umi.use(keypairIdentity(mintKeypair));
   const mint = mintKeypair.publicKey;
-  // findMetadataPda expects a PublicKey, not string
-  const metadataPda = findMetadataPda(mint);
-  const metadataAccount = await umi.rpc.getAccount(metadataPda);
+  // Use Metaplex's PDA utility for UMI
+  const metadataPda = findMetadataPda(umi, { mint });
+  // Try .toBase58(), .toString(), or use as-is depending on PDA type
+  let metadataAccount;
+  if (metadataPda && typeof metadataPda.toBase58 === 'function') {
+    metadataAccount = await umi.rpc.getAccount(metadataPda.toBase58());
+  } else if (metadataPda && typeof metadataPda.toString === 'function') {
+    metadataAccount = await umi.rpc.getAccount(metadataPda.toString());
+  } else if (Array.isArray(metadataPda)) {
+    metadataAccount = await umi.rpc.getAccount(metadataPda[0]);
+  } else {
+    metadataAccount = await umi.rpc.getAccount(metadataPda);
+  }
 
   const uri = `data:application/json;base64,${Buffer.from(JSON.stringify(METADATA)).toString('base64')}`;
 
