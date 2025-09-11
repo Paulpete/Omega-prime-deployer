@@ -41,11 +41,27 @@ RELAYER_API_KEY=<YOUR_API_KEY> # Optional
 npm run mainnet:all
 ```
 
-## Copilot
+
+## Copilot: Dream-Mind-Lucid AI (with i-who-me Reference & Memory)
 Run the interactive Grok Copilot:
 ```
 npm run mainnet:copilot
 ```
+
+### 🧠 Copilot Self-Awareness & Memory
+- **i-who-me reference logic**: Copilot tracks its own actions, context, and user intent.
+- **Memory hooks**: Recent actions and decision logs are stored in memory (see `grok-copilot.ts`).
+- **Redundancy detection**: Copilot warns if you repeat an action or enter a loop.
+- **Self-checks**: Playful Grok-style responses ("Am I the dreamer or the dreamed?") appear during operation.
+- **Decision log**: Copilot logs all major decisions and actions for transparency.
+
+### Example Self-Check Output
+```
+🤖 [Copilot Self-Check]: Am I the dreamer or the dreamed?
+	Context: Last action = createTokenMint, User intent = 2
+```
+
+See the top of `grok-copilot.ts` for the CopilotMemory and i-who-me logic implementation.
 
 ## Rust Program (Pentacle)
 Build the Solana program:

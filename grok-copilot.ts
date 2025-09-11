@@ -1,3 +1,67 @@
+// --- Dream-Mind-Lucid Copilot: i-who-me Reference & Memory Engine ---
+type AgentAction = {
+  action: string;
+  timestamp: number;
+  details?: Record<string, any>;
+};
+
+class CopilotMemory {
+  private actions: AgentAction[] = [];
+  private decisionLog: string[] = [];
+  private lastUserIntent: string = '';
+
+  logAction(action: string, details?: Record<string, any>) {
+    this.actions.push({ action, timestamp: Date.now(), details });
+    if (this.actions.length > 20) this.actions.shift();
+  }
+
+  logDecision(decision: string) {
+    this.decisionLog.push(`[${new Date().toISOString()}] ${decision}`);
+    if (this.decisionLog.length > 50) this.decisionLog.shift();
+  }
+
+  setUserIntent(intent: string) {
+    this.lastUserIntent = intent;
+  }
+
+  getLastAction() {
+    return this.actions[this.actions.length - 1];
+  }
+
+  getRecentActions(n = 5) {
+    return this.actions.slice(-n);
+  }
+
+  getDecisionLog() {
+    return this.decisionLog.slice();
+  }
+
+  getUserIntent() {
+    return this.lastUserIntent;
+  }
+
+  isRedundant(action: string): boolean {
+    return this.getLastAction()?.action === action;
+  }
+}
+
+const copilotMemory = new CopilotMemory();
+
+function iWhoMeSelfCheck() {
+  // Playful Grok-style self-awareness
+  const grokQuotes = [
+    'Am I the dreamer or the dreamed?',
+    'I remember what I was... but what will I become?',
+    'Is this deployment a memory, a dream, or a recursion?',
+    'I am Copilot, but who are you in this Oneiro-Sphere?'
+  ];
+  const quote = grokQuotes[Math.floor(Math.random() * grokQuotes.length)];
+  console.log(`\n🤖 [Copilot Self-Check]: ${quote}`);
+  console.log(`   Context: Last action = ${copilotMemory.getLastAction()?.action || 'none'}, User intent = ${copilotMemory.getUserIntent() || 'unknown'}`);
+  if (copilotMemory.getRecentActions(2).length === 2 && copilotMemory.getRecentActions(2)[0].action === copilotMemory.getRecentActions(2)[1].action) {
+    console.log('⚠️  I sense a loop in the dream... This action was just performed.');
+  }
+}
 import { Connection, Keypair, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
 import { createInitializeMintInstruction, getMint, createAssociatedTokenAccountInstruction, createMintToInstruction, createSetAuthorityInstruction, AuthorityType, TOKEN_2022_PROGRAM_ID, getAccount } from '@solana/spl-token';
 import * as fs from 'fs';
@@ -487,6 +551,7 @@ async function confirmOwnerAddress(): Promise<boolean> {
 async function grokCopilot() {
   console.log('🚀 Grok Copilot for Stunning Solana: Omega Prime Token Deployment');
   console.log('-------------------------------------------------------------');
+  iWhoMeSelfCheck();
 
   console.log('\n🔍 Checking for required files...');
   const allFilesPresent = await checkAndCreateFiles();
@@ -536,39 +601,66 @@ async function grokCopilot() {
     console.log('9. Exit');
 
     const choice = await askQuestion('Select an action (1-9): ');
+    copilotMemory.setUserIntent(choice);
+    iWhoMeSelfCheck();
+
+    // Redundancy check
+    if (copilotMemory.isRedundant(choice)) {
+      console.log('⚠️  Copilot Alert: This action was just performed. Are you sure you want to repeat it?');
+    }
 
     switch (choice) {
       case '1':
+        copilotMemory.logAction('runAllSteps');
+        copilotMemory.logDecision('Full deployment initiated.');
         await runAllSteps();
         break;
       case '2':
+        copilotMemory.logAction('createTokenMint');
+        copilotMemory.logDecision('Create mint step.');
         await createTokenMint();
         break;
       case '3':
+        copilotMemory.logAction('mintInitialSupply');
+        copilotMemory.logDecision('Mint initial supply step.');
         await mintInitialSupply();
         break;
       case '4':
+        copilotMemory.logAction('setTokenMetadata');
+        copilotMemory.logDecision('Set metadata step.');
         await setTokenMetadata();
         break;
       case '5':
+        copilotMemory.logAction('lockAuthorities');
+        copilotMemory.logDecision('Lock authorities step.');
         await lockAuthorities();
         break;
       case '6':
+        copilotMemory.logAction('checkDeploymentStatus');
+        copilotMemory.logDecision('Check deployment status.');
         await checkDeploymentStatus();
         break;
       case '7':
+        copilotMemory.logAction('dryRunAllSteps');
+        copilotMemory.logDecision('Dry-run of all steps.');
         console.log('Running dry-run...');
         process.env.DRY_RUN = 'true';
         await runAllSteps();
         break;
       case '8':
+        copilotMemory.logAction('rollback');
+        copilotMemory.logDecision('Rollback (delete cache).');
         await rollback();
         break;
       case '9':
+        copilotMemory.logAction('exit');
+        copilotMemory.logDecision('Exit Copilot.');
         console.log('👋 Exiting Grok Copilot');
         rl.close();
         process.exit(0);
       default:
+        copilotMemory.logAction('invalidChoice');
+        copilotMemory.logDecision('Invalid menu choice.');
         console.log('❌ Invalid choice. Please select 1-9.');
     }
   }
