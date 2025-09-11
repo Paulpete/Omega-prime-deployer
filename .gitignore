@@ -47,6 +47,7 @@ Thumbs.db
 *.temp
 .tmp/
 temp/
+test-copilot-features.js
 
 # Remove built files that may contain secrets
 dist/
