@@ -13,7 +13,11 @@ async function mintInitialSupply() {
   const connection = new Connection(process.env.RPC_URL!, 'confirmed');
   const userAuth = loadOrCreateUserAuth();
   const relayerPubkey = new PublicKey(process.env.RELAYER_PUBKEY!);
-  const treasuryPubkey = new PublicKey('4eJZVbbsiLAG6EkWvgEYEWKEpdhJPFBYMeJ6DBX98w6a');
+  if (!process.env.TREASURY_PUBKEY) {
+    console.error('TREASURY_PUBKEY not set in .env');
+    process.exit(1);
+  }
+  const treasuryPubkey = new PublicKey(process.env.TREASURY_PUBKEY);
   const cacheDir = path.join(process.cwd(), '.cache');
   const mintCachePath = path.join(cacheDir, 'mint.json');
   const mintKeypairPath = path.join(cacheDir, 'mint-keypair.json');
@@ -81,6 +85,6 @@ async function mintInitialSupply() {
 }
 
 mintInitialSupply().catch((e) => {
-  console.error(`Mint initial supply failed: ${e.message}`);
+  console.error('Mint initial supply failed:', e);
   process.exit(1);
 });

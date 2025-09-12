@@ -37,13 +37,25 @@ export async function sendViaRelayer(
         headers,
         body: JSON.stringify({ signedTransactionBase64: b64 }),
       });
-      const j = await res.json();
-      if (!j.success) throw new Error(j.error || `Relayer error (attempt ${attempt})`);
+      let j;
+      try {
+        j = await res.json();
+      } catch (jsonErr) {
+        console.error('Failed to parse relayer response as JSON:', jsonErr);
+        const text = await res.text();
+        console.error('Relayer raw response:', text);
+        throw new Error('Relayer response not JSON');
+      }
+      if (!j.success) {
+        console.error('Relayer error response:', j);
+        throw new Error(j.error || `Relayer error (attempt ${attempt})`);
+      }
       await connection.confirmTransaction({ signature: j.txSignature, blockhash, lastValidBlockHeight }, 'confirmed');
       console.log(`Transaction confirmed: https://explorer.solana.com/tx/${j.txSignature} (${Date.now() - start}ms)`);
       return j.txSignature;
     } catch (e: any) {
-      if (attempt === 3) throw new Error(`Relayer failed after 3 attempts: ${e.message}`);
+      console.error('Relayer attempt error:', e);
+      if (attempt === 3) throw new Error(`Relayer failed after 3 attempts: ${e.message || e}`);
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
