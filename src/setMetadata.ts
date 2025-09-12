@@ -1,6 +1,6 @@
 import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { createMetadataAccountV3, updateMetadataAccountV2, findMetadataPda } from '@metaplex-foundation/mpl-token-metadata';
-import { keypairIdentity, PublicKey, publicKey } from '@metaplex-foundation/umi';
+import { keypairIdentity, publicKey } from '@metaplex-foundation/umi';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
@@ -39,7 +39,7 @@ async function setTokenMetadata() {
     const mint = mintKeypair.publicKey;
     
     // Use Metaplex's UMI-compatible PDA function
-    const metadataPda = findMetadataPda(umi, { mint });
+    const metadataPda = findMetadataPda(umi, { mint: publicKey(mint) });
     
     const uri = `data:application/json;base64,${Buffer.from(JSON.stringify(METADATA)).toString('base64')}`;
 
