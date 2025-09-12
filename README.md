@@ -72,6 +72,26 @@ The Copilot includes playful responses like:
 ### 🚀 Enhanced Menu Options
 - **Option 9**: 🧠 Memory & Context Check (checka) - Shows complete system status, memory logs, and decision history
 
+## Testing
+
+### Relayer Integration Test
+Verify that the Helius relayer configuration is correct:
+```
+npm run test:relayer
+```
+
+This test validates:
+- Environment variable configuration
+- API endpoint format
+- Request payload structure
+- Headers and authentication
+
+### Deployment Testing
+Test the deployment in dry-run mode:
+```
+DRY_RUN=true npm run mainnet:copilot
+```
+
 ## Helius Gasless Transaction Service
 
 This deployment uses Helius's gasless transaction service for zero-cost deployment:
