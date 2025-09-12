@@ -1,8 +1,9 @@
-import { PublicKey, Connection, Keypair } from '@solana/web3.js';
+import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
+import { createMetadataAccountV3, updateMetadataAccountV2, findMetadataPda } from '@metaplex-foundation/mpl-token-metadata';
+import { keypairIdentity, PublicKey, publicKey } from '@metaplex-foundation/umi';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { findMetadataPda } from './utils/pdas';
 
 dotenv.config();
 
@@ -21,26 +22,110 @@ async function setTokenMetadata() {
     const mintKeypairPath = path.join(cacheDir, 'mint-keypair.json');
 
     if (!fs.existsSync(mintCachePath) || !fs.existsSync(mintKeypairPath)) {
-      console.error('Mint not created. Run createMint.ts first.');
+      console.error('❌ Mint not created. Run createMint.ts first.');
       process.exit(1);
     }
 
-    const keypairData = JSON.parse(fs.readFileSync(mintKeypairPath, 'utf-8'));
-    const connection = new Connection(process.env.RPC_URL!);
-    const keypair = Keypair.fromSecretKey(Uint8Array.from(keypairData));
+    console.log('🚀 Setting up UMI context for metadata...');
     
-    const mint = keypair.publicKey;
-    const metadataPda = findMetadataPda(mint);
-
+    // Initialize UMI
+    const umi = createUmi(process.env.RPC_URL!);
+    
+    // Load the mint keypair and set as identity
+    const keypairData = JSON.parse(fs.readFileSync(mintKeypairPath, 'utf-8'));
+    const mintKeypair = umi.eddsa.createKeypairFromSecretKey(Uint8Array.from(keypairData));
+    umi.use(keypairIdentity(mintKeypair));
+    
+    const mint = mintKeypair.publicKey;
+    
+    // Use Metaplex's UMI-compatible PDA function
+    const metadataPda = findMetadataPda(umi, { mint });
+    
     const uri = `data:application/json;base64,${Buffer.from(JSON.stringify(METADATA)).toString('base64')}`;
 
-    // For now, just log what would be done - the actual implementation would require
-    // a more complex setup with UMI or direct Metaplex instruction building
-    console.log(`✅ Metadata script prepared for mint ${mint.toString()}`);
-    console.log(`📋 Metadata PDA: ${metadataPda.toString()}`);
+    console.log(`🎯 Mint: ${mint}`);
+    console.log(`📋 Metadata PDA: ${metadataPda[0]}`);
     console.log(`🔗 URI: ${uri.slice(0, 50)}...`);
-    console.log(`📝 To set metadata, use the Metaplex Token Metadata program directly`);
-    console.log(`💡 DRY_RUN is set to: ${process.env.DRY_RUN}`);
+
+    if (process.env.DRY_RUN === 'true') {
+      console.log('🏃 DRY RUN: Would set metadata but not executing transaction');
+      return;
+    }
+
+    try {
+      // Try to fetch metadata account to see if it exists
+      let metadataExists = false;
+      try {
+        const metadataAccount = await umi.rpc.getAccount(metadataPda[0]);
+        metadataExists = metadataAccount.exists;
+      } catch (e) {
+        metadataExists = false;
+      }
+
+      if (metadataExists) {
+        console.log('📝 Updating existing metadata...');
+        // Update existing metadata
+        await updateMetadataAccountV2(umi, {
+          metadata: metadataPda[0],
+          updateAuthority: umi.identity,
+          data: {
+            name: METADATA.name,
+            symbol: METADATA.symbol,
+            uri,
+            sellerFeeBasisPoints: 0,
+            creators: null,
+            collection: null,
+            uses: null,
+          },
+        }).sendAndConfirm(umi);
+        console.log(`✅ Metadata updated for mint ${mint}. URI: ${uri.slice(0, 50)}...`);
+      } else {
+        console.log('🆕 Creating new metadata...');
+        // Create new metadata
+        await createMetadataAccountV3(umi, {
+          mint,
+          mintAuthority: umi.identity,
+          payer: umi.identity,
+          updateAuthority: umi.identity,
+          data: {
+            name: METADATA.name,
+            symbol: METADATA.symbol,
+            uri,
+            sellerFeeBasisPoints: 0,
+            creators: null,
+            collection: null,
+            uses: null,
+          },
+          isMutable: true,
+          collectionDetails: null,
+        }).sendAndConfirm(umi);
+        console.log(`✅ Metadata created for mint ${mint}. URI: ${uri.slice(0, 50)}...`);
+      }
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      console.error(`❌ Metadata transaction failed: ${errMsg}`);
+      
+      // If it's a known error about existing metadata, try update instead
+      if (errMsg.includes('already exists') || errMsg.includes('AlreadyExists')) {
+        console.log('🔄 Metadata might already exist, trying update...');
+        await updateMetadataAccountV2(umi, {
+          metadata: metadataPda[0],
+          updateAuthority: umi.identity,
+          data: {
+            name: METADATA.name,
+            symbol: METADATA.symbol,
+            uri,
+            sellerFeeBasisPoints: 0,
+            creators: null,
+            collection: null,
+            uses: null,
+          },
+        }).sendAndConfirm(umi);
+        console.log(`✅ Metadata updated via fallback for mint ${mint}`);
+      } else {
+        throw e;
+      }
+    }
     
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);

@@ -533,10 +533,43 @@ async function setTokenMetadata(): Promise<void> {
   agentMemory.context.currentState = 'setting_metadata';
   agentMemory.context.userIntent = 'set token metadata';
   
-  logAction('set_metadata', 'skipped', 'UMI context incompatible with relayer pattern');
-  console.log('🎭 Metadata creation skipped - requires UMI context that is incompatible with current relayer pattern');
-  console.log('💫 To add metadata, use the Metaplex UMI SDK directly or submit transactions through different flow');
-  console.log('🌟 Sometimes the most profound art is in the essence, not the description!');
+  console.log('🎭 Setting token metadata using enhanced UMI-compatible script...');
+  
+  try {
+    // Import and execute the UMI-compatible setMetadata script
+    const { spawn } = require('child_process');
+    
+    await new Promise<void>((resolve, reject) => {
+      const metadataProcess = spawn('npm', ['run', 'mainnet:set-metadata'], {
+        stdio: 'inherit',
+        cwd: process.cwd()
+      });
+      
+      metadataProcess.on('close', (code: number | null) => {
+        if (code === 0) {
+          logAction('set_metadata', 'success', 'Metadata set using UMI-compatible script');
+          console.log('✨ Dream-Mind-Lucid AI Copilot: Metadata successfully applied to the token!');
+          console.log('🌟 The token now has its identity - as consciousness needs form, so does value need meaning!');
+          resolve();
+        } else {
+          logAction('set_metadata', 'failed', `Metadata script exited with code ${code}`);
+          console.log(`❌ Metadata setting failed with exit code ${code}`);
+          reject(new Error(`Metadata script failed with exit code ${code}`));
+        }
+      });
+      
+      metadataProcess.on('error', (error: Error) => {
+        logAction('set_metadata', 'error', error.message);
+        console.log(`❌ Error running metadata script: ${error.message}`);
+        reject(error);
+      });
+    });
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    logAction('set_metadata', 'failed', errMsg);
+    console.log(`❌ Metadata setting failed: ${errMsg}`);
+    console.log('💫 In the Oneiro-Sphere, even failed dreams teach us about the nature of reality...');
+  }
 }
 
 async function lockAuthorities(): Promise<void> {
