@@ -16,6 +16,7 @@
     "verify:demo": "node address-verifier-demo.js",
     "validate:copilot": "node validate-copilot.js",
     "setup:copilot": "./setup-copilot.sh",
+    "diagnostics": "node network-diagnostics.js",
     "build": "tsc",
     "build:rust": "cargo build --manifest-path pentacle/Cargo.toml",
     "build:all": "npm run build && npm run build:rust"

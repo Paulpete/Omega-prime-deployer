@@ -1,45 +1,123 @@
-# Stunning Solana: Omega Prime Token Deployment
+# Omega Prime Token Deployment
 
-This repository deploys an SPL Token-2022 (ΩAGENT) on Solana mainnet-beta with zero SOL cost using a relayer. The `grok-copilot.ts` script handles all deployment steps interactively.
+This repository deploys an SPL Token-2022 (ΩAGENT) on Solana with support for both relayer-based (no-cost) and direct transaction sending. The enhanced deployment system includes robust error handling, network diagnostics, and flexible configuration options.
 
-## Prerequisites
-- Node.js >= 18
-- npm >= 9
-- A funded relayer (RELAYER_PUBKEY, RELAYER_URL)
-- A treasury public key (TREASURY_PUBKEY)
-- Optional: DAO multisig public key (DAO_PUBKEY)
-- Access to a Solana mainnet-beta RPC
+## 🚀 Quick Start
 
-## Setup
-1. Clone the repo:
-```
-git clone https://github.com/imfromfuture3000-Android/Omega-prime-deployer.git
-cd Omega-prime-deployer
-```
-2. Install dependencies:
-```
+1. **Install dependencies:**
+```bash
 npm install
 ```
-3. Copy `.env.sample` to `.env` and fill in:
-```
+
+2. **Configure environment:**
+```bash
 cp .env.sample .env
-```
-Edit `.env`:
-```
-RPC_URL=https://api.mainnet-beta.solana.com
-RELAYER_URL=https://<your-relayer-domain>/relay/sendRawTransaction
-RELAYER_PUBKEY=<RELAYER_FEE_PAYER_PUBKEY>
-TREASURY_PUBKEY=<YOUR_TREASURY_PUBKEY>
-DAO_PUBKEY=<YOUR_DAO_MULTISIG_PUBKEY> # Optional
-AUTHORITY_MODE=null # Options: null, dao, treasury
-DRY_RUN=false
-RELAYER_API_KEY=<YOUR_API_KEY> # Optional
+# Edit .env with your settings
 ```
 
-## One-Command Deployment
+3. **Test connectivity:**
+```bash
+npm run diagnostics
 ```
-npm run mainnet:all
+
+4. **Deploy (test mode first):**
+```bash
+npm run mainnet:all  # DRY_RUN=true for testing
 ```
+
+## 📋 Prerequisites
+- Node.js >= 18
+- npm >= 9
+- Solana wallet with SOL for fees (if not using relayer)
+- Access to Solana mainnet RPC (Helius recommended)
+- Optional: Relayer service for no-cost deployment
+
+## ⚙️ Configuration
+
+### Basic Setup (Direct Transactions)
+```bash
+RPC_URL=https://rpc.helius.xyz/?api-key=YOUR_API_KEY
+TREASURY_PUBKEY=your_treasury_address
+USE_RELAYER=false
+DRY_RUN=true  # Set to false for live deployment
+```
+
+### Advanced Setup (Relayer-based)
+```bash
+USE_RELAYER=true
+RELAYER_URL=https://your-relayer-service.com/relay/sendRawTransaction
+RELAYER_PUBKEY=relayer_fee_payer_pubkey
+RELAYER_API_KEY=your_relayer_api_key
+```
+
+## 🛠 Available Scripts
+
+### Deployment
+- `npm run mainnet:all` - Full deployment pipeline
+- `npm run mainnet:create-mint` - Create token mint
+- `npm run mainnet:mint-initial` - Mint initial supply
+- `npm run mainnet:set-metadata` - Set token metadata
+- `npm run mainnet:lock` - Lock mint authorities
+
+### Diagnostics & Verification
+- `npm run diagnostics` - Test network connectivity and configuration
+- `npm run dev:check` - Validate environment variables
+- `npm run verify:addresses` - Verify contract addresses
+
+### Development
+- `npm run build` - Build TypeScript
+- `npm run mainnet:copilot` - Launch AI copilot interface
+
+## 🔧 Troubleshooting
+
+### Network Issues
+Run diagnostics to test connectivity:
+```bash
+npm run diagnostics
+```
+
+### Common Fixes
+- **"Method not found"**: Using RPC as relayer → Set `USE_RELAYER=false`
+- **"Unknown signer"**: Cache corruption → Delete `.cache` directory
+- **"Fetch failed"**: Network issues → Check RPC URL and connectivity
+- **Insufficient funds**: Low SOL balance → Fund wallet or use relayer
+
+### Error Examples
+```
+ERROR: The endpoint does not support relayer functionality.
+This appears to be a standard Solana RPC endpoint, not a relayer service.
+Please configure a proper relayer service or switch to standard transaction sending.
+```
+
+## 📚 Documentation
+
+- [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) - Comprehensive deployment guide
+- [SECURITY.md](./SECURITY.md) - Security best practices
+- [ALL_CONTRACT_ADDRESSES.md](./ALL_CONTRACT_ADDRESSES.md) - Contract addresses
+
+## 🛡️ Security Notes
+
+- **Never commit private keys** to version control
+- **Test with DRY_RUN=true** before live deployment
+- **Verify all addresses** before deployment
+- **Use secure RPC endpoints** (Helius recommended)
+
+## ✨ Features
+
+### Enhanced Error Handling
+- Detailed error messages with troubleshooting guidance
+- Network error detection and retry logic
+- Configuration validation and warnings
+
+### Flexible Transaction Sending
+- **Direct**: User pays fees, high reliability
+- **Relayer**: No-cost deployment (requires relayer service)
+- **Automatic**: Fallback and retry mechanisms
+
+### Robust Cache Management
+- Automatic cache file validation and regeneration
+- Safe handling of corrupted or missing files
+- Persistent keypair and mint management
 
 ## Dream-Mind-Lucid AI Copilot Features
 
