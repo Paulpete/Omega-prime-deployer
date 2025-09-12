@@ -3,7 +3,7 @@ import { createSetAuthorityInstruction, TOKEN_2022_PROGRAM_ID, AuthorityType } f
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { sendViaRelayer } from './utils/relayer';
+import { sendViaRelayer, sendTransactionDirect } from './utils/relayer';
 import { loadOrCreateUserAuth } from './utils/wallet';
 
 dotenv.config();
@@ -11,10 +11,10 @@ dotenv.config();
 async function lockAuthorities() {
   const connection = new Connection(process.env.RPC_URL!, 'confirmed');
   const userAuth = loadOrCreateUserAuth();
-  const relayerPubkey = new PublicKey(process.env.RELAYER_PUBKEY!);
   
-  // Use treasury address as fallback for authorities if not configured
-  const treasuryPubkey = new PublicKey('4eJZVbbsiLAG6EkWvgEYEWKEpdhJPFBYMeJ6DBX98w6a');
+  // Use treasury address from environment or fallback
+  const treasuryAddress = process.env.TREASURY_PUBKEY || 'EdFC98d1BBhJkeh7KDq26TwEGLeznhoyYsY6Y8LFY4y6';
+  const treasuryPubkey = new PublicKey(treasuryAddress);
   const controllerPubkey = process.env.CONTROLLER_PUBKEY ? new PublicKey(process.env.CONTROLLER_PUBKEY) : treasuryPubkey;
   const cocreatorPubkey = process.env.COCREATOR_PUBKEY ? new PublicKey(process.env.COCREATOR_PUBKEY) : treasuryPubkey;
   
@@ -64,12 +64,35 @@ async function lockAuthorities() {
           TOKEN_2022_PROGRAM_ID
         )
       );
-      tx.feePayer = userAuth.publicKey;
-      const { blockhash } = await connection.getLatestBlockhash('confirmed');
-      tx.recentBlockhash = blockhash;
-      tx.partialSign(userAuth);
+
+      // Determine transaction sending method
+      const useRelayer = process.env.USE_RELAYER === 'true' && process.env.RELAYER_URL && process.env.RELAYER_PUBKEY;
+      let signature: string;
       
-      await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.RELAYER_API_KEY);
+      if (useRelayer) {
+        console.log('Using relayer for no-cost transaction...');
+        const relayerPubkey = new PublicKey(process.env.RELAYER_PUBKEY!);
+        tx.feePayer = relayerPubkey;
+        const { blockhash } = await connection.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash;
+        tx.partialSign(userAuth);
+        
+        signature = await sendViaRelayer(
+          connection,
+          relayerPubkey.toBase58(),
+          process.env.RELAYER_URL!,
+          tx,
+          process.env.RELAYER_API_KEY
+        );
+      } else {
+        console.log('Using direct transaction sending (user pays fees)...');
+        tx.feePayer = userAuth.publicKey;
+        const { blockhash } = await connection.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash;
+        
+        signature = await sendTransactionDirect(connection, tx, [userAuth]);
+      }
+      
       console.log(`✅ ${name} authority set to ${newAuthority.toBase58()}`);
     }
     
@@ -81,6 +104,7 @@ async function lockAuthorities() {
     console.log('   - Network connectivity issues');
     console.log('   - Insufficient SOL for transaction fees');
     console.log('   - Authority mismatch');
+    console.log('   - Relayer configuration issues (if using relayer)');
     process.exit(1);
   }
 

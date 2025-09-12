@@ -3,7 +3,7 @@ import { getOrCreateAssociatedTokenAccount, createMintToInstruction, TOKEN_2022_
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-import { sendViaRelayer } from './utils/relayer';
+import { sendViaRelayer, sendTransactionDirect } from './utils/relayer';
 import { loadOrCreateUserAuth } from './utils/wallet';
 import { findAssociatedTokenAddress } from './utils/pdas';
 
@@ -12,8 +12,11 @@ dotenv.config();
 async function mintInitialSupply() {
   const connection = new Connection(process.env.RPC_URL!, 'confirmed');
   const userAuth = loadOrCreateUserAuth();
-  const relayerPubkey = new PublicKey(process.env.RELAYER_PUBKEY!);
-  const treasuryPubkey = new PublicKey('4eJZVbbsiLAG6EkWvgEYEWKEpdhJPFBYMeJ6DBX98w6a');
+  
+  // Use treasury from environment
+  const treasuryAddress = process.env.TREASURY_PUBKEY || 'EdFC98d1BBhJkeh7KDq26TwEGLeznhoyYsY6Y8LFY4y6';
+  const treasuryPubkey = new PublicKey(treasuryAddress);
+  
   const cacheDir = path.join(process.cwd(), '.cache');
   const mintCachePath = path.join(cacheDir, 'mint.json');
   const mintKeypairPath = path.join(cacheDir, 'mint-keypair.json');
@@ -72,19 +75,43 @@ async function mintInitialSupply() {
       createMintToInstruction(
         mint,
         treasuryAta,
-        userAuth.publicKey,
+        userAuth.publicKey, // mint authority
         supply,
         [],
         TOKEN_2022_PROGRAM_ID
       )
     );
 
-    tx.feePayer = userAuth.publicKey;
-    const { blockhash } = await connection.getLatestBlockhash('confirmed');
-    tx.recentBlockhash = blockhash;
-    tx.partialSign(userAuth, mintKeypair);
+    // Determine transaction sending method
+    const useRelayer = process.env.USE_RELAYER === 'true' && process.env.RELAYER_URL && process.env.RELAYER_PUBKEY;
+    let signature: string;
     
-    await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.RELAYER_API_KEY);
+    if (useRelayer) {
+      console.log('Using relayer for no-cost transaction...');
+      const relayerPubkey = new PublicKey(process.env.RELAYER_PUBKEY!);
+      tx.feePayer = relayerPubkey;
+      const { blockhash } = await connection.getLatestBlockhash('confirmed');
+      tx.recentBlockhash = blockhash;
+      tx.partialSign(userAuth, mintKeypair);
+      
+      signature = await sendViaRelayer(
+        connection,
+        relayerPubkey.toBase58(),
+        process.env.RELAYER_URL!,
+        tx,
+        process.env.RELAYER_API_KEY
+      );
+    } else {
+      console.log('Using direct transaction sending (user pays fees)...');
+      console.log(`Fee will be paid by: ${userAuth.publicKey.toBase58()}`);
+      
+      tx.feePayer = userAuth.publicKey;
+      const { blockhash } = await connection.getLatestBlockhash('confirmed');
+      tx.recentBlockhash = blockhash;
+      
+      signature = await sendTransactionDirect(connection, tx, [userAuth, mintKeypair]);
+    }
+    
     console.log(`✅ Minted ${supply} tokens to ${treasuryAta.toBase58()}`);
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e);
@@ -93,6 +120,7 @@ async function mintInitialSupply() {
     console.log('   - Network connectivity issues');
     console.log('   - Insufficient SOL for transaction fees');
     console.log('   - Authority mismatch');
+    console.log('   - Relayer configuration issues (if using relayer)');
     process.exit(1);
   }
 }

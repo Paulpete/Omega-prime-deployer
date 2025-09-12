@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 
-import { sendViaRelayer } from './utils/relayer';
+import { sendViaRelayer, sendTransactionDirect } from './utils/relayer';
 import { loadOrCreateUserAuth } from './utils/wallet';
 
 const retries = 10;
@@ -16,10 +16,11 @@ async function createTokenMintWithRetry() {
     try {
       const connection = new Connection(process.env.RPC_URL!, 'confirmed');
       const userAuth = loadOrCreateUserAuth();
-      const relayerPubkey = new PublicKey(process.env.RELAYER_PUBKEY!);
       const cacheDir = path.join(process.cwd(), '.cache');
       const mintCachePath = path.join(cacheDir, 'mint.json');
-      process.env.TREASURY_PUBKEY = '4eJZVbbsiLAG6EkWvgEYEWKEpdhJPFBYMeJ6DBX98w6a';
+      
+      // Use treasury from environment or fallback
+      const treasuryAddress = process.env.TREASURY_PUBKEY || 'EdFC98d1BBhJkeh7KDq26TwEGLeznhoyYsY6Y8LFY4y6';
 
       if (fs.existsSync(mintCachePath)) {
         let mint: string | undefined;
@@ -107,8 +108,8 @@ async function createTokenMintWithRetry() {
       const tx = new Transaction();
       let ownerPubkey: PublicKey | undefined, freezePubkey: PublicKey | undefined;
       try {
-  ownerPubkey = new PublicKey('4eJZVbbsiLAG6EkWvgEYEWKEpdhJPFBYMeJ6DBX98w6a');
-        freezePubkey = new PublicKey('4eJZVbbsiLAG6EkWvgEYEWKEpdhJPFBYMeJ6DBX98w6a');
+        ownerPubkey = new PublicKey(treasuryAddress);
+        freezePubkey = new PublicKey(treasuryAddress);
       } catch (err) {
         console.error('Error constructing owner/freeze PublicKey:', err);
         process.exit(1);
@@ -126,18 +127,40 @@ async function createTokenMintWithRetry() {
           TOKEN_2022_PROGRAM_ID
         )
       );
-      // Set fee payer and recent blockhash
-      if (!userAuth || !userAuth.publicKey || !(userAuth.publicKey instanceof PublicKey)) {
-        console.error('User auth keypair or publicKey is undefined or invalid!');
-        process.exit(1);
-      }
-      tx.feePayer = userAuth.publicKey;
-      const { blockhash } = await connection.getLatestBlockhash('confirmed');
-      tx.recentBlockhash = blockhash;
-  // Sign only with mintKeypair; relayer will be fee payer and finalize
-  tx.partialSign(userAuth, mintKeypair);
 
-      const signature = await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.RELAYER_API_KEY);
+      // Determine transaction sending method
+      const useRelayer = process.env.USE_RELAYER === 'true' && process.env.RELAYER_URL && process.env.RELAYER_PUBKEY;
+      let signature: string;
+      
+      if (useRelayer) {
+        console.log('Using relayer for no-cost transaction...');
+        const relayerPubkey = new PublicKey(process.env.RELAYER_PUBKEY!);
+        tx.feePayer = relayerPubkey;
+        const { blockhash } = await connection.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash;
+        
+        // Sign only with mintKeypair; relayer will be fee payer and finalize
+        tx.partialSign(mintKeypair);
+        
+        signature = await sendViaRelayer(
+          connection, 
+          relayerPubkey.toBase58(), 
+          process.env.RELAYER_URL!, 
+          tx, 
+          process.env.RELAYER_API_KEY
+        );
+      } else {
+        console.log('Using direct transaction sending (user pays fees)...');
+        console.log(`Fee will be paid by: ${userAuth.publicKey.toBase58()}`);
+        
+        // Set fee payer and recent blockhash
+        tx.feePayer = userAuth.publicKey;
+        const { blockhash } = await connection.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash;
+        
+        // Send transaction directly
+        signature = await sendTransactionDirect(connection, tx, [userAuth, mintKeypair]);
+      }
       if (signature !== 'DRY_RUN_SIGNATURE') {
         if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
         fs.writeFileSync(mintCachePath, JSON.stringify({ mint: mintKeypair.publicKey.toBase58() }));
