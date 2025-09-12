@@ -105,7 +105,7 @@ async function createTokenMintWithRetry() {
   // Sign only with mintKeypair; relayer will be fee payer and finalize
   tx.partialSign(userAuth, mintKeypair);
 
-      const signature = await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.RELAYER_API_KEY);
+      const signature = await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.HELIUS_API_KEY);
       if (signature !== 'DRY_RUN_SIGNATURE') {
         if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
         fs.writeFileSync(mintCachePath, JSON.stringify({ mint: mintKeypair.publicKey.toBase58() }));

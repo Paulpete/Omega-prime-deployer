@@ -66,14 +66,14 @@ export function getSecureConfig(): SecurityConfig {
     cocreatorPubkey: process.env.COCREATOR_PUBKEY,
     relayerUrl: process.env.RELAYER_URL,
     relayerPubkey: process.env.RELAYER_PUBKEY,
-    relayerApiKey: process.env.RELAYER_API_KEY,
+    relayerApiKey: process.env.HELIUS_API_KEY,
     authorityMode: process.env.AUTHORITY_MODE || 'null',
     dryRun: process.env.DRY_RUN === 'true'
   };
 
   // Validate API keys
   validateApiKey(config.heliusApiKey, 'HELIUS_API_KEY');
-  validateApiKey(config.relayerApiKey, 'RELAYER_API_KEY');
+  validateApiKey(config.relayerApiKey, 'HELIUS_API_KEY');
 
   // Validate public keys
   validatePublicKey(config.sourceWalletAddress, 'SOURCE_WALLET_ADDRESS');

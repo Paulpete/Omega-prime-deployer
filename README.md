@@ -1,14 +1,14 @@
 # Stunning Solana: Omega Prime Token Deployment
 
-This repository deploys an SPL Token-2022 (ΩAGENT) on Solana mainnet-beta with zero SOL cost using a relayer. The `grok-copilot.ts` script handles all deployment steps interactively.
+This repository deploys an SPL Token-2022 (ΩAGENT) on Solana mainnet-beta with zero SOL cost using Helius gasless transaction service. The `grok-copilot.ts` script handles all deployment steps interactively.
 
 ## Prerequisites
 - Node.js >= 18
 - npm >= 9
-- A funded relayer (RELAYER_PUBKEY, RELAYER_URL)
+- A Helius API key for gasless transactions
 - A treasury public key (TREASURY_PUBKEY)
 - Optional: DAO multisig public key (DAO_PUBKEY)
-- Access to a Solana mainnet-beta RPC
+- Access to Helius RPC endpoints
 
 ## Setup
 1. Clone the repo:
@@ -26,14 +26,17 @@ cp .env.sample .env
 ```
 Edit `.env`:
 ```
-RPC_URL=https://api.mainnet-beta.solana.com
-RELAYER_URL=https://<your-relayer-domain>/relay/sendRawTransaction
+# Helius Configuration for No-Cost Deployment
+RPC_URL=https://rpc.helius.xyz/?api-key=<YOUR_HELIUS_API_KEY>
+HELIUS_API_KEY=<YOUR_HELIUS_API_KEY>
+RELAYER_URL=https://api.helius.xyz/v0/transactions/send
 RELAYER_PUBKEY=<RELAYER_FEE_PAYER_PUBKEY>
-TREASURY_PUBKEY=<YOUR_TREASURY_PUBKEY>
+
+# Treasury Configuration
+TREASURY_PUBKEY=EdFC98d1BBhJkeh7KDq26TwEGLeznhoyYsY6Y8LFY4y6
 DAO_PUBKEY=<YOUR_DAO_MULTISIG_PUBKEY> # Optional
 AUTHORITY_MODE=null # Options: null, dao, treasury
 DRY_RUN=false
-RELAYER_API_KEY=<YOUR_API_KEY> # Optional
 ```
 
 ## One-Command Deployment
@@ -69,6 +72,23 @@ The Copilot includes playful responses like:
 ### 🚀 Enhanced Menu Options
 - **Option 9**: 🧠 Memory & Context Check (checka) - Shows complete system status, memory logs, and decision history
 
+## Helius Gasless Transaction Service
+
+This deployment uses Helius's gasless transaction service for zero-cost deployment:
+
+### ✅ Fixed Relayer Integration
+- **Proper API format**: Uses Helius `/v0/transactions/send` endpoint
+- **Enhanced error handling**: Detailed logging for transaction debugging
+- **Rebate support**: Automatically includes rebate address for the deployer
+- **Multiple response formats**: Handles various Helius response structures
+
+### 🔧 Configuration Requirements
+```
+HELIUS_API_KEY=your_helius_api_key
+RELAYER_URL=https://api.helius.xyz/v0/transactions/send
+RELAYER_PUBKEY=fee_payer_public_key_from_helius
+```
+
 ## Copilot
 Run the interactive Grok Copilot:
 ```
@@ -83,7 +103,7 @@ cargo build --manifest-path pentacle/Cargo.toml
 
 ## Security Notes
 - No private keys are stored in the repo.
-- Relayer pays fees: All fees are covered by the relayer.
+- Helius relayer pays fees: All fees are covered by the gasless service.
 - Authority lock: Setting to `null` is irreversible.
 
 ## Post-Deploy Checklist

@@ -210,6 +210,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 import { createInterface } from 'readline';
+import { sendViaRelayer } from './src/utils/relayer';
 
 dotenv.config();
 
@@ -358,42 +359,6 @@ function loadOrCreateUserAuth(): Keypair {
   return keypair;
 }
 
-async function sendViaRelayer(connection: Connection, relayerPubkey: string, relayerUrl: string, tx: Transaction, apiKey?: string): Promise<string> {
-  const start = Date.now();
-  tx.feePayer = new PublicKey(relayerPubkey);
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
-  tx.recentBlockhash = blockhash;
-
-  const b64 = tx.serialize({ requireAllSignatures: false }).toString('base64');
-  if (process.env.DRY_RUN === 'true') {
-    console.log(`[DRY_RUN] Transaction base64: ${b64.slice(0, 120)}...`);
-    console.log(`[DRY_RUN] Transaction size: ${b64.length} bytes`);
-    return 'DRY_RUN_SIGNATURE';
-  }
-
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
-
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const res = await fetch(relayerUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ signedTransactionBase64: b64 }),
-      });
-      const j = await res.json();
-      if (!j.success) throw new Error(j.error || `Relayer error (attempt ${attempt})`);
-      await connection.confirmTransaction({ signature: j.txSignature, blockhash, lastValidBlockHeight }, 'confirmed');
-      console.log(`Transaction confirmed: https://explorer.solana.com/tx/${j.txSignature} (${Date.now() - start}ms)`);
-      return j.txSignature;
-    } catch (e: any) {
-      if (attempt === 3) throw new Error(`Relayer failed after 3 attempts: ${e.message}`);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-  }
-  throw new Error('Relayer unreachable');
-}
-
 async function createTokenMint(): Promise<PublicKey> {
   const iWhoMe = IWhoMeReference.getInstance();
   agentMemory.context.currentState = 'creating_mint';
@@ -446,7 +411,7 @@ async function createTokenMint(): Promise<PublicKey> {
   );
 
   tx.partialSign(userAuth, mintKeypair);
-  const signature = await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.RELAYER_API_KEY);
+  const signature = await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.HELIUS_API_KEY);
   if (signature !== 'DRY_RUN_SIGNATURE') {
     if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
     fs.writeFileSync(mintCachePath, JSON.stringify({ mint: mintKeypair.publicKey.toBase58() }));
@@ -520,7 +485,7 @@ async function mintInitialSupply(): Promise<void> {
   tx.add(mintInstruction);
 
   tx.partialSign(userAuth);
-  const signature = await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.RELAYER_API_KEY);
+  const signature = await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.HELIUS_API_KEY);
   
   logAction('mint_supply', 'success', `Minted ${supply.toString()} tokens to treasury`);
   agentMemory.context.currentState = 'supply_minted';
@@ -591,7 +556,7 @@ async function lockAuthorities(): Promise<void> {
 
   for (const tx of txs) {
     tx.partialSign(userAuth);
-    const signature = await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.RELAYER_API_KEY);
+    const signature = await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.HELIUS_API_KEY);
     console.log(`Authority set: ${signature}`);
   }
 
@@ -671,7 +636,7 @@ async function checkAndCreateFiles(): Promise<boolean> {
 }
 
 async function checkEnv(): Promise<boolean> {
-  const required = ['RPC_URL', 'RELAYER_URL', 'RELAYER_PUBKEY', 'TREASURY_PUBKEY'];
+  const required = ['RPC_URL', 'RELAYER_URL', 'RELAYER_PUBKEY', 'TREASURY_PUBKEY', 'HELIUS_API_KEY'];
   for (const key of required) {
     if (!process.env[key]) {
       console.error(`Missing ${key} in .env`);
@@ -687,6 +652,7 @@ async function checkEnv(): Promise<boolean> {
     }
     if (process.env.DAO_PUBKEY) new PublicKey(process.env.DAO_PUBKEY);
     console.log(`✅ Treasury owner confirmed: ${treasuryPubkey.toBase58()}`);
+    console.log(`✅ Helius API key configured: ${process.env.HELIUS_API_KEY!.slice(0, 8)}...`);
   } catch (e) {
     console.error('Invalid public key in .env');
     return false;

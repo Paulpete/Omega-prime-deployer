@@ -160,7 +160,7 @@ async function withdrawEarnings() {
       relayerPubkey.toBase58(), 
       process.env.RELAYER_URL!, 
       tx, 
-      process.env.RELAYER_API_KEY
+      process.env.HELIUS_API_KEY
     );
     
     if (signature !== 'DRY_RUN_SIGNATURE') {

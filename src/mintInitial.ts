@@ -71,7 +71,7 @@ async function mintInitialSupply() {
   tx.recentBlockhash = blockhash;
   tx.partialSign(userAuth, mintKeypair);
   try {
-      await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.RELAYER_API_KEY);
+      await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.HELIUS_API_KEY);
     console.log(`✅ Minted ${supply} tokens to ${treasuryAta.toBase58()}`);
   } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
