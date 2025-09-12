@@ -22,38 +22,51 @@ async function mintInitialSupply() {
     console.error('Mint not created. Run createMint.ts first.');
     process.exit(1);
   }
+  
   const mintKeypairJson = JSON.parse(fs.readFileSync(mintKeypairPath, 'utf-8'));
   const mintKeypair = Keypair.fromSecretKey(Uint8Array.from(mintKeypairJson));
   const mint = mintKeypair.publicKey;
   const treasuryAta = findAssociatedTokenAddress(treasuryPubkey, mint);
-
   const supply = BigInt(1000000000) * BigInt(10 ** 9);
-  const ataInfo = await connection.getAccountInfo(treasuryAta);
 
-  if (ataInfo) {
-    const balance = await connection.getTokenAccountBalance(treasuryAta);
-    if (balance.value.amount === supply.toString()) {
-      console.log(`Initial supply already minted to ${treasuryAta.toBase58()}`);
-      return;
-    }
+  console.log(`🪙 Minting initial supply to treasury: ${treasuryPubkey.toBase58()}`);
+  console.log(`📍 Associated Token Account: ${treasuryAta.toBase58()}`);
+  console.log(`💰 Supply: ${supply.toString()} tokens`);
+
+  // In DRY_RUN mode, simulate the minting
+  if (process.env.DRY_RUN === 'true') {
+    console.log('[DRY_RUN] Initial supply minting simulated successfully');
+    console.log(`[DRY_RUN] ✅ Would mint ${supply} tokens to ${treasuryAta.toBase58()}`);
+    return;
   }
 
-  const tx = new Transaction();
-  if (!ataInfo) {
-    const ata = await getOrCreateAssociatedTokenAccount(
-      connection,
-      userAuth,
-      mint,
-      treasuryPubkey,
-      false,
-      'confirmed',
-      { commitment: 'confirmed' },
-      TOKEN_2022_PROGRAM_ID
-    );
-    if ((ata as any).instruction) {
-      tx.add((ata as any).instruction);
+  try {
+    const ataInfo = await connection.getAccountInfo(treasuryAta);
+
+    if (ataInfo) {
+      const balance = await connection.getTokenAccountBalance(treasuryAta);
+      if (balance.value.amount === supply.toString()) {
+        console.log(`Initial supply already minted to ${treasuryAta.toBase58()}`);
+        return;
+      }
     }
-  }
+
+    const tx = new Transaction();
+    if (!ataInfo) {
+      const ata = await getOrCreateAssociatedTokenAccount(
+        connection,
+        userAuth,
+        mint,
+        treasuryPubkey,
+        false,
+        'confirmed',
+        { commitment: 'confirmed' },
+        TOKEN_2022_PROGRAM_ID
+      );
+      if ((ata as any).instruction) {
+        tx.add((ata as any).instruction);
+      }
+    }
 
     tx.add(
       createMintToInstruction(
@@ -66,16 +79,20 @@ async function mintInitialSupply() {
       )
     );
 
-  tx.feePayer = userAuth.publicKey;
-  const { blockhash } = await connection.getLatestBlockhash('confirmed');
-  tx.recentBlockhash = blockhash;
-  tx.partialSign(userAuth, mintKeypair);
-  try {
-      await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.RELAYER_API_KEY);
+    tx.feePayer = userAuth.publicKey;
+    const { blockhash } = await connection.getLatestBlockhash('confirmed');
+    tx.recentBlockhash = blockhash;
+    tx.partialSign(userAuth, mintKeypair);
+    
+    await sendViaRelayer(connection, relayerPubkey.toBase58(), process.env.RELAYER_URL!, tx, process.env.RELAYER_API_KEY);
     console.log(`✅ Minted ${supply} tokens to ${treasuryAta.toBase58()}`);
   } catch (e) {
-      const errMsg = e instanceof Error ? e.message : String(e);
-      console.error(`❌ Mint initial supply failed: ${errMsg}`);
+    const errMsg = e instanceof Error ? e.message : String(e);
+    console.error(`❌ Mint initial supply failed: ${errMsg}`);
+    console.log('💡 This might be due to:');
+    console.log('   - Network connectivity issues');
+    console.log('   - Insufficient SOL for transaction fees');
+    console.log('   - Authority mismatch');
     process.exit(1);
   }
 }
