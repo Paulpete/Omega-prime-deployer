@@ -1,0 +1,75 @@
+{
+  "name": "OmegaPrimeDeployer",
+  "displayName": "Omega Prime Token Deployer",
+  "description": "A VS Code extension to deploy the ΩAGENT token on Solana with a relayer, manage wallets, and monitor deployment status.",
+  "version": "0.0.1",
+  "publisher": "AutomataLabs",
+  "engines": {
+    "vscode": "^1.101.0"
+  },
+  "categories": ["AI", "Blockchain", "Deployment"],
+  "keywords": ["solana", "spl-token", "omega-prime", "token-deployment", "relayer", "blockchain", "web3"],
+  "main": "./out/extension.js",
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "npm run compile && node ./out/test/runTest.js"
+  },
+  "icon": "logo.png",
+  "contributes": {
+    "commands": [
+      { "command": "OmegaPrime:RunFullDeployment", "title": "OmegaPrime: Run Full Deployment" },
+      { "command": "OmegaPrime:CreateMint", "title": "OmegaPrime: Create Mint" },
+      { "command": "OmegaPrime:MintInitialSupply", "title": "OmegaPrime: Mint Initial Supply" },
+      { "command": "OmegaPrime:SetMetadata", "title": "OmegaPrime: Set Metadata" },
+      { "command": "OmegaPrime:LockAuthorities", "title": "OmegaPrime: Lock Authorities" },
+      { "command": "OmegaPrime:CheckStatus", "title": "OmegaPrime: Check Status" },
+      { "command": "OmegaPrime:DryRun", "title": "OmegaPrime: Dry Run" },
+      { "command": "OmegaPrime:Rollback", "title": "OmegaPrime: Rollback" }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Omega Prime Deployer Configuration",
+      "properties": {
+        "omegaPrimeDeployer.logLevel": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error", "none"],
+          "default": "info",
+          "description": "Log verbosity for Omega Prime Deployer"
+        },
+        "omegaPrimeDeployer.network": {
+          "type": "string",
+          "enum": ["mainnet-beta", "devnet", "testnet"],
+          "default": "mainnet-beta",
+          "description": "Solana network selection"
+        },
+        "omegaPrimeDeployer.relayerUrl": {
+          "type": "string",
+          "default": "https://relayer.example.com",
+          "description": "Default relayer URL"
+        },
+        "omegaPrimeDeployer.relayerApiKey": {
+          "type": "string",
+          "description": "Optional API key for relayer"
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/vscode": "^1.101.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.95.0",
+    "@solana/spl-token": "^0.4.0",
+    "@metaplex-foundation/mpl-token-metadata": "^2.4.0",
+    "bs58": "^5.0.0",
+    "dotenv": "^16.4.5",
+  "@vscode/extension-telemetry": "^0.6.2"
+    
+  }
+}
