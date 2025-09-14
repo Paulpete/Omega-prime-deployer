@@ -8,6 +8,13 @@
 
 // === [1] Imports and Constants ===
 import { Connection, Keypair, PublicKey, Transaction, SystemProgram, sendAndConfirmTransaction } from '@solana/web3.js';
+// Use Node built-ins via require to avoid missing type declarations in limited dev environments
+// @ts-ignore
+const fs = require('fs');
+// @ts-ignore
+const path = require('path');
+// Buffer may not be declared in the TS environment; declare it to avoid errors
+declare var Buffer: any;
 import { createMint, getAssociatedTokenAddress, mintTo, setAuthority, AuthorityType, createMintToInstruction, createSetAuthorityInstruction, createAssociatedTokenAccountInstruction, createInitializeMintInstruction } from '@solana/spl-token';
 import { createCreateMetadataAccountV3Instruction, createUpdateMetadataAccountV2Instruction } from '@metaplex-foundation/mpl-token-metadata';
 
@@ -18,9 +25,79 @@ const TOKEN_PROGRAM = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA
 const METAPLEX_METADATA = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 
-// Wallet with 0 SOL (from provided secret key)
-const WALLET_SECRET = new Uint8Array([84,32,127,214,116,85,6,53,123,7,157,124,156,124,90,0,67,65,168,44,121,219,184,2,228,213,113,213,202,218,9,222,90,172,60,63,40,62,136,119,36,193,119,154,84,58,209,237,238,119,144,82,128,70,61,171,218,63,186,120,57,121,163,150]);
-const WALLET = Keypair.fromSecretKey(WALLET_SECRET);
+// Wallet loader: prefer env / file-based secrets. Never keep secret arrays committed in the repo.
+function parseSecretJson(raw: string | undefined): Uint8Array | null {
+  if (!raw) return null;
+  try {
+    if (raw.trim().startsWith('[')) {
+      const arr = JSON.parse(raw) as number[];
+      if (Array.isArray(arr) && arr.length >= 64) return Uint8Array.from(arr);
+    }
+  } catch (e) {
+    // ignore
+  }
+  return null;
+}
+
+function parseBase58(raw: string | undefined): Uint8Array | null {
+  if (!raw) return null;
+  try {
+    // @ts-ignore
+    const bs58 = require('bs58');
+    return Uint8Array.from(bs58.decode(raw.trim()));
+  } catch (e) {
+    return null;
+  }
+}
+
+async function loadWalletFromEnvOrFile(): Promise<Keypair> {
+  // 1) WALLET_SECRET_JSON (JSON array string)
+  const jsonRaw = process.env.WALLET_SECRET_JSON;
+  const parsed = parseSecretJson(jsonRaw);
+  if (parsed) return Keypair.fromSecretKey(parsed);
+
+  // 2) WALLET_SECRET_BASE58 (base58 string)
+  const b58 = process.env.WALLET_SECRET_BASE58;
+  const parsedB58 = parseBase58(b58);
+  if (parsedB58) return Keypair.fromSecretKey(parsedB58);
+
+  // 3) PRIVATE_KEY_PATH -> file containing JSON array
+  const privatePath = process.env.PRIVATE_KEY_PATH;
+  if (privatePath) {
+    try {
+      const p = path.resolve(process.cwd(), privatePath);
+      if (fs.existsSync(p)) {
+        const raw = fs.readFileSync(p, 'utf8');
+        const fromFile = parseSecretJson(raw);
+        if (fromFile) return Keypair.fromSecretKey(fromFile);
+        const fromFileB58 = parseBase58(raw);
+        if (fromFileB58) return Keypair.fromSecretKey(fromFileB58);
+      }
+    } catch (err) {
+      const e: any = err;
+      console.warn('Failed to read PRIVATE_KEY_PATH:', e.message || e);
+    }
+  }
+
+  // Fallback: generate an ephemeral keypair for dry-run/dev. Warn clearly.
+  console.warn('No wallet secret provided via WALLET_SECRET_JSON, WALLET_SECRET_BASE58, or PRIVATE_KEY_PATH. Using a generated ephemeral keypair (dev only). Do NOT use this in production.');
+  return Keypair.generate();
+}
+
+// Initialize WALLET (async loader used synchronously at top-level for simplicity)
+// Initialize WALLET asynchronously up front; scripts that depend on WALLET should await `ensureWallet()` when running in async contexts.
+let WALLET: Keypair | null = null;
+export async function ensureWallet(): Promise<Keypair> {
+  if (WALLET) return WALLET;
+  WALLET = await loadWalletFromEnvOrFile();
+  return WALLET;
+}
+
+// Module-level getter that ensures WALLET is present. Call `await ensureWallet()` at startup before using getters in async flows.
+export function getWallet(): Keypair {
+  if (!WALLET) throw new Error('WALLET not initialized; call ensureWallet() first');
+  return WALLET;
+}
 const CONNECTION = new Connection('https://rpc.helius.xyz/?api-key=16b9324a-5b8c-47b9-9b02-6efa868958e5'); // Updated RPC_URL
 
 // Relayer details
@@ -28,7 +105,32 @@ const RELAYER_URL = 'https://rpc.helius.xyz/v0/relay-transaction?api-key=16b9324
 const RELAYER_PUBKEY = new PublicKey('8cRrU1NzNpjL3k2BwjW3VixAcX6VFc29KHr4KZg8cs2Y');
 const TREASURY_PUBKEY = ''; // Empty as provided
 const AUTHORITY_MODE = 'EdFC98d1BBhJkeh7KDq26TwEGLeznhoyYsY6Y8LFY4y6null';
-const DRY_RUN = false;
+// Live mode flag: set to false to run on-chain. We'll also allow overriding by env var.
+let DRY_RUN = false;
+if (process.env.DRY_RUN && process.env.DRY_RUN.toLowerCase() === 'true') DRY_RUN = true;
+
+// Load payer secret from env when running live. Expect a JSON array string or base58 secret.
+let PAYER_KEYPAIR: Keypair | null = null;
+if (!DRY_RUN && process.env.PAYER_SECRET) {
+  try {
+    const raw = process.env.PAYER_SECRET;
+    let sk: number[] | null = null;
+    if (raw.trim().startsWith('[')) {
+      sk = JSON.parse(raw) as number[];
+    }
+    if (sk && Array.isArray(sk)) {
+      PAYER_KEYPAIR = Keypair.fromSecretKey(Uint8Array.from(sk));
+    } else {
+      // try base58 decode via bs58 if available
+      // @ts-ignore
+      const bs58 = require('bs58');
+      const skU8 = bs58.decode(raw.trim());
+      PAYER_KEYPAIR = Keypair.fromSecretKey(Uint8Array.from(skU8));
+    }
+  } catch (e) {
+    console.warn('Failed to parse PAYER_SECRET; will continue but transactions may fail:', e);
+  }
+}
 
 // Potential payer with SOL
 const PAYER_PUBLIC_KEY = new PublicKey('5HhU67S3roojWjSsU7kEWouhBPe3bfmxqe15N9hJAYFZ');
@@ -45,8 +147,14 @@ const ENTROPY_LEAK = 'e445a52e51cb9a1d6be1a5ed5b9ed5dc4318661b1696b770aec83670ab
 // === [2] Main Deployment Function ===
 async function deployImpulse() {
   console.log('🚀 Starting IMPULSE deployment...');
-  console.log('Wallet:', WALLET.publicKey.toBase58());
-  console.log('Balance:', await CONNECTION.getBalance(WALLET.publicKey) / 1e9, 'SOL');
+  // Ensure wallet is loaded before continuing
+  await ensureWallet();
+  function getWallet(): Keypair {
+    if (!WALLET) throw new Error('WALLET not initialized');
+    return WALLET;
+  }
+  console.log('Wallet:', getWallet().publicKey.toBase58());
+  console.log('Balance:', await CONNECTION.getBalance(getWallet().publicKey) / 1e9, 'SOL');
   console.log('Payer Balance:', await CONNECTION.getBalance(PAYER_PUBLIC_KEY) / 1e9, 'SOL');
   console.log('Relayer Balance:', await CONNECTION.getBalance(RELAYER_PUBKEY) / 1e9, 'SOL');
   console.log('DRY_RUN:', DRY_RUN);
@@ -58,7 +166,7 @@ async function deployImpulse() {
     console.log('DRY RUN: Would send configTx');
   } else {
     if (configResult.tx.instructions.length > 0) {
-      await sendAndConfirmTransaction(CONNECTION, configResult.tx, [WALLET, ...configResult.signers]);
+  await sendTx(CONNECTION, configResult.tx, [getWallet(), ...configResult.signers]);
     } else {
       console.log('Skipping empty configTx');
     }
@@ -70,9 +178,16 @@ async function deployImpulse() {
   if (DRY_RUN) {
     console.log('DRY RUN: Would send poolTx');
   } else {
-    await sendAndConfirmTransaction(CONNECTION, poolResult.tx, [WALLET, ...poolResult.signers]);
+  await sendTx(CONNECTION, poolResult.tx, [getWallet(), ...poolResult.signers]);
   }
   console.log('📢 Mint address announced:', CURRENT_MINT?.toBase58());
+
+  // Persist important addresses (mint/controller) to .cache/addresses.json
+  try {
+    await saveAddress('impulse_mint', (await getMintAddress()).toBase58());
+  } catch (e) {
+    console.warn('Could not save addresses cache:', e);
+  }
 
   // Step 3: Set Metadata
   console.log('3. Setting metadata...');
@@ -80,7 +195,7 @@ async function deployImpulse() {
   if (DRY_RUN) {
     console.log('DRY RUN: Would send metadataTx');
   } else {
-    await sendAndConfirmTransaction(CONNECTION, metadataResult.tx, [WALLET, ...metadataResult.signers]);
+  await sendTx(CONNECTION, metadataResult.tx, [getWallet(), ...metadataResult.signers]);
   }
 
   // Step 4: Mint Tokens
@@ -89,7 +204,7 @@ async function deployImpulse() {
   if (DRY_RUN) {
     console.log('DRY RUN: Would send mintTx');
   } else {
-    await sendAndConfirmTransaction(CONNECTION, mintResult.tx, [WALLET, ...mintResult.signers]);
+  await sendTx(CONNECTION, mintResult.tx, [getWallet(), ...mintResult.signers]);
   }
 
   // Step 5: Transfer Ownership to Proxy
@@ -99,15 +214,136 @@ async function deployImpulse() {
     console.log('DRY RUN: Would send transferTx');
   } else {
     if (transferResult.tx.instructions.length > 0) {
-      await sendAndConfirmTransaction(CONNECTION, transferResult.tx, [WALLET, ...transferResult.signers]);
+  await sendTx(CONNECTION, transferResult.tx, [getWallet(), ...transferResult.signers]);
     } else {
       console.log('Skipping empty transferTx');
     }
   }
 
+  // Choose controller address (we'll use the configured payer public key as controller)
+  const CONTROLLER_ADDRESS = PAYER_PUBLIC_KEY.toBase58();
+  console.log('📌 Chosen controller address:', CONTROLLER_ADDRESS);
+
+  // Persist controller address
+  try {
+    await saveAddress('controller', CONTROLLER_ADDRESS);
+  } catch (e) {
+    console.warn('Could not save controller address:', e);
+  }
+
+  // After transfer, optionally mint some tokens to the controller (or simulate in dry-run)
+  console.log('6. Minting additional allocation to controller...');
+  if (DRY_RUN) {
+    console.log(`DRY RUN: Would mint allocation to controller ${CONTROLLER_ADDRESS}`);
+  } else {
+    try {
+      const mint = await getMintAddress();
+      const controllerPub = new PublicKey(CONTROLLER_ADDRESS);
+    const ata = await getAssociatedTokenAddress(mint, controllerPub);
+    const mintTx = new Transaction();
+    // ensure ATA exists
+    mintTx.add(createAssociatedTokenAccountInstruction(getWallet().publicKey, ata, controllerPub, mint));
+    const controllerAmount = 100000000; // 100M as example allocation
+    mintTx.add(createMintToInstruction(mint, ata, getWallet().publicKey, controllerAmount));
+  await sendTx(CONNECTION, mintTx, [getWallet()]);
+      console.log(`Minted ${controllerAmount} tokens to controller ${CONTROLLER_ADDRESS}`);
+    } catch (e) {
+      console.warn('Failed to mint to controller:', e);
+    }
+  }
+
+  // Finally, renounce mint authority (ensure this happens after controller receives allocation)
+  try {
+    const mint = await getMintAddress();
+  const renTx = new Transaction();
+    renTx.add(createSetAuthorityInstruction(mint, getWallet().publicKey, AuthorityType.MintTokens, null));
+    if (DRY_RUN) {
+      console.log('DRY RUN: Would renounce mint authority now');
+    } else {
+  await sendTx(CONNECTION, renTx, [getWallet()]);
+      console.log('🔥 Mint authority renounced. Token is now immutable.');
+    }
+  } catch (e) {
+    console.warn('Failed to renounce mint authority:', e);
+  }
+
   console.log('✅ IMPULSE deployed successfully!');
   console.log('Mint Address:', await getMintAddress());
   console.log('Explorer: https://explorer.solana.com/address/' + (await getMintAddress()).toBase58() + '?cluster=mainnet');
+}
+
+// === [7] Address cache helpers ===
+const CACHE_DIR = path.resolve(process.cwd(), '.cache');
+const ADDR_FILE = path.join(CACHE_DIR, 'addresses.json');
+
+async function loadAddresses(): Promise<Record<string, string>> {
+  try {
+    if (!fs.existsSync(ADDR_FILE)) return {};
+    const raw = await fs.promises.readFile(ADDR_FILE, 'utf8');
+    return JSON.parse(raw || '{}');
+  } catch (e) {
+    const err: any = e;
+    console.warn('Failed reading addresses cache, returning empty:', err?.message || err);
+    return {};
+  }
+}
+
+async function saveAddress(key: string, value: string) {
+  try {
+    if (!fs.existsSync(CACHE_DIR)) {
+      await fs.promises.mkdir(CACHE_DIR, { recursive: true });
+    }
+    const addrs = await loadAddresses();
+    // Merge: avoid overwriting existing value unless different
+    if (addrs[key] && addrs[key] === value) {
+      console.log('Address cache unchanged for', key);
+      return;
+    }
+    addrs[key] = value;
+    await fs.promises.writeFile(ADDR_FILE, JSON.stringify(addrs, null, 2), 'utf8');
+    console.log('Saved addresses cache to', ADDR_FILE);
+  } catch (e) {
+    const err: any = e;
+    console.warn('Failed to save address cache:', err?.message || err);
+  }
+}
+
+// Helper to send a transaction using either WALLET as fee payer or the provided PAYER_KEYPAIR
+async function sendTx(connection: Connection, tx: Transaction, signers: Keypair[] = []) {
+  // If a dedicated payer keypair is configured and available, use it as fee payer
+  if (PAYER_KEYPAIR) {
+    tx.feePayer = PAYER_KEYPAIR.publicKey;
+  } else {
+    tx.feePayer = getWallet().publicKey;
+  }
+
+  // recent blockhash
+  tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+  // Ensure unique array and include payer in signers if it's being used
+  const allSigners: Keypair[] = [];
+  if (PAYER_KEYPAIR) allSigners.push(PAYER_KEYPAIR);
+  // Avoid duplicates
+  for (const s of signers) if (!allSigners.find(x => x.publicKey.equals(s.publicKey))) allSigners.push(s);
+
+  // Partially sign with any program-derived keypairs already provided
+  if (allSigners.length > 0) tx.sign(...allSigners);
+
+  // If WALLET is required to sign (it's the mint authority or payer), ensure it's included
+  if (!allSigners.find(x => x.publicKey.equals(getWallet().publicKey))) {
+    try {
+      tx.partialSign(getWallet());
+    } catch (e) {
+      // ignore if wallet not needed
+    }
+  }
+
+  // Send serialized transaction
+  const signed = tx.serialize();
+  const sig = await connection.sendRawTransaction(signed);
+  await connection.confirmTransaction(sig, 'confirmed');
+  console.log('Transaction sent:', sig);
+  return sig;
 }
 
 // === [3] Helper Functions ===
@@ -124,14 +360,15 @@ async function initializeVirtualPool() {
   const mintKeypair = Keypair.generate();
   CURRENT_MINT = mintKeypair.publicKey;
   const tx = new Transaction();
+  const w = getWallet();
   tx.add(SystemProgram.createAccount({
-    fromPubkey: WALLET.publicKey,
+    fromPubkey: w.publicKey,
     newAccountPubkey: mintKeypair.publicKey,
     space: 82, // Mint account size
     lamports: await CONNECTION.getMinimumBalanceForRentExemption(82),
     programId: TOKEN_PROGRAM,
   }));
-  tx.add(createInitializeMintInstruction(mintKeypair.publicKey, 6, WALLET.publicKey, null));
+  tx.add(createInitializeMintInstruction(mintKeypair.publicKey, 6, w.publicKey, null));
   // Add Meteora DBC instructions (simplified)
   return { tx, signers: [mintKeypair] };
 }
@@ -141,12 +378,13 @@ async function setMetadata() {
   const mint = await getMintAddress();
   const metadataPda = await PublicKey.findProgramAddress([Buffer.from('metadata'), METAPLEX_METADATA.toBuffer(), mint.toBuffer()], METAPLEX_METADATA);
   const tx = new Transaction();
+  const w = getWallet();
   tx.add(createCreateMetadataAccountV3Instruction({
     metadata: metadataPda[0],
     mint,
-    mintAuthority: WALLET.publicKey,
-    payer: WALLET.publicKey,
-    updateAuthority: WALLET.publicKey,
+    mintAuthority: w.publicKey,
+    payer: w.publicKey,
+    updateAuthority: w.publicKey,
   }, {
     createMetadataAccountArgsV3: {
       data: {
@@ -171,22 +409,23 @@ async function mintTokens() {
   const tx = new Transaction();
 
   // Generate 10 random addresses for bots, traders, MEV, stakers, etc. (working for treasury)
+  const w = getWallet();
   const recipients: Keypair[] = [];
   for (let i = 0; i < 9; i++) {
     recipients.push(Keypair.generate());
   }
-  recipients.push(WALLET); // Include treasury as the 10th
+  recipients.push(w); // Include treasury as the 10th
 
   const amountPerRecipient = 100000000; // 100M tokens each (total 1B)
 
   for (const recipient of recipients) {
     const ata = await getAssociatedTokenAddress(mint, recipient.publicKey);
-    tx.add(createAssociatedTokenAccountInstruction(WALLET.publicKey, ata, recipient.publicKey, mint));
-    tx.add(createMintToInstruction(mint, ata, WALLET.publicKey, amountPerRecipient));
+    tx.add(createAssociatedTokenAccountInstruction(w.publicKey, ata, recipient.publicKey, mint));
+    tx.add(createMintToInstruction(mint, ata, w.publicKey, amountPerRecipient));
     console.log(`📢 Minting ${amountPerRecipient} to ${recipient.publicKey.toBase58()} (${recipient === WALLET ? 'Treasury' : 'Bot/Staker/etc.'})`);
   }
 
-  tx.add(createSetAuthorityInstruction(mint, WALLET.publicKey, AuthorityType.MintTokens, null)); // Burn authority (renounce mint)
+  tx.add(createSetAuthorityInstruction(mint, w.publicKey, AuthorityType.MintTokens, null)); // Burn authority (renounce mint)
   console.log('🔥 Mint authority renounced. Token is now immutable.');
   console.log('📢 Announcing mint address:', mint.toBase58());
   return { tx, signers: [] };
